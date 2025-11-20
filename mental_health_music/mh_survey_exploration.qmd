@@ -1,0 +1,120 @@
+---
+title: "Mental Health and Musical Preferences"
+author: "Meghan Harris"
+format: html
+engine: knitr
+execute:
+  echo: true
+  warning: false
+  error: true
+# Extension configuration
+filters:
+  - collapse-output
+extensions:
+  collapse-output:
+    method: javascript
+format-options:
+  python:
+    code-formatter: none
+---
+
+# Introduction
+
+
+# Data Exploration
+First, we import the data.
+
+::: {.panel-tabset}
+
+## R
+
+```{r, r-data-import}
+# install.packages(c("janitor", "readr", "here"))
+
+# Grab relative data path
+data_path <-
+  here::here(
+    "mental_health_music",
+    "data",
+    "mxmh_survey_results.csv"
+  )
+
+# Import data and clean vars
+df_mh_music_r <-
+  readr::read_csv(data_path) |>
+  janitor::clean_names()
+
+```
+
+## Python
+
+```{python, py-data-import}
+import polars as pl
+import janitor.polars
+from pathlib import Path
+
+data_path = Path("data") / "mxmh_survey_results.csv"
+
+# Read in csv
+df_mh_music_py = pl.read_csv(
+    data_path,
+    # This is needed because there's decimals in the
+    # scoring cols where integer was inferred
+    infer_schema_length=1000,
+)
+
+# Clean the names
+df_mh_music_py = df_mh_music_py.clean_names(remove_special=True)
+```
+
+:::
+
+Then, do a little skimming with glimpse...
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r, r-data-glimpse}
+#| output-fold: true
+library(dplyr)
+
+# Take a peek
+df_mh_music_r |>
+  glimpse()
+
+```
+
+## Python
+
+```{python, py-data-glimpse}
+# | output-fold: true
+# Take a peek
+df_mh_music_py.glimpse()
+```
+
+:::
+
+# Data Cleaning and Preprocessing
+
+# Model Fitting
+
+# Model Evaluation
+
+# Feature Importance / Coefficients
+
+# Interpretation & Insights
+
+# Conclusion
+
+```{python, scratch-code}
+#| echo: false
+#| eval: false
+
+import numpy as np
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix
+import plotnine as p9
+```
