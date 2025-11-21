@@ -20,8 +20,15 @@ format-options:
 
 # Introduction
 
+I haven't done statistical modeling since 2021, and back then I tried using base R's `lm()` and hated it. I didn't know tidymodels existed at the time, so I assumed modeling just wasn't for me. Fast forward to 2024: I'm pivoting from data science to open source development, learning Python alongside R, and decided to revisit modeling with modern tools. This notebook compares a simple ML workflow in both R (tidymodels) and Python (scikit-learn) to:
 
-# Data Exploration
+1. Refresh my modeling skills using tidymodels (which actually makes sense to my brain)
+2. Practice Python by replicating a workflow I understand in R
+
+I'm using the [Music & Mental Health Survey Results](https://www.kaggle.com/datasets/catherinerasgaitis/mxmh-survey-results) dataset from Kaggle to predict anxiety scores from music listening habits.
+
+
+# Data Import and Viewing
 First, we import the data.
 
 ::: {.panel-tabset}
@@ -29,7 +36,9 @@ First, we import the data.
 ## R
 
 ```{r, r-data-import}
-# install.packages(c("janitor", "readr", "here"))
+# install.packages(c("janitor", "tidyverse", "tidymodels"))
+library(tidymodels)
+library(tidyverse)
 
 # Grab relative data path
 data_path <-
@@ -41,7 +50,7 @@ data_path <-
 
 # Import data and clean vars
 df_mh_music_r <-
-  readr::read_csv(data_path) |>
+  read_csv(data_path) |>
   janitor::clean_names()
 
 ```
@@ -51,9 +60,10 @@ df_mh_music_r <-
 ```{python, py-data-import}
 import polars as pl
 import janitor.polars
+import plotnine as p9
 from pathlib import Path
 
-data_path = Path("data") / "mxmh_survey_results.csv"
+data_path = Path("data", "mxmh_survey_results.csv")
 
 # Read in csv
 df_mh_music_py = pl.read_csv(
@@ -95,35 +105,211 @@ df_mh_music_py.glimpse()
 
 :::
 
-# Data Cleaning and Preprocessing
+# Data Exploration
 
+Looking at the data, I'm interested in predicting "anxiety score" from musical listening patterns with respect to genre frequencies.
+We'll need the `anxiety`, `frequency_*` and maybe the `hours_per_day` variables, so let's visualize what we have here.
 ::: {.panel-tabset collapse=true}
 
 ## R
 
-```{r, r-data-clean}
+```{r}
 
-# Cleaning will go here
 
 ```
 
 ## Python
 
-```{python, py-data-clean}
+```{python}
 
-# Cleaning will go here
+
+```
+
+:::
+# Data Cleaning 
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+
+```
+
+## Python
+
+```{python}
+
 
 ```
 
 :::
 
-# Model Fitting
+# Train/Test Split
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+
+# Model Building
+
+## Recipe Definition
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+## Model Specification
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+## Workflow Creation
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+# Model Tuning
+
+## Cross-Validation Setup
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+## Tuning Grid & Selection
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+# Final Model Tuning
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
 
 # Model Evaluation
 
-# Feature Importance / Coefficients
+::: {.panel-tabset collapse=true}
 
-# Interpretation & Insights
+## R
+
+```{r}
+
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+# Comparison & Takeaways
 
 # Conclusion
 
