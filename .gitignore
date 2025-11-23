@@ -30,3 +30,4 @@ _site/
 
 *.woff
 *.woff2
+.quarto/project-cache/
