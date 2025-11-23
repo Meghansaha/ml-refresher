@@ -2,11 +2,12 @@
 title: "Mental Health and Musical Preferences"
 author: "Meghan Harris"
 format: html
-engine: knitr
 execute:
   echo: true
   warning: false
   error: true
+engine: knitr
+code-fold: true
 # Extension configuration
 filters:
   - collapse-output
@@ -16,12 +17,20 @@ extensions:
 format-options:
   python:
     code-formatter: none
+    path: ".venv/Scripts/python.exe"
 ---
 
 # Introduction
 
+I haven't done statistical modeling since 2021, and back then I tried using base R's `lm()` and hated it. I didn't know tidymodels existed at the time, so I assumed modeling just wasn't for me. Fast forward to 2024: I'm pivoting from data science to open source development, learning Python alongside R, and decided to revisit modeling with modern tools. This notebook compares a simple ML workflow in both R (tidymodels) and Python (scikit-learn) to:
 
-# Data Exploration
+1. Refresh my modeling skills using tidymodels (which actually makes sense to my brain)
+2. Practice Python by replicating a workflow I understand in R
+
+I'm using the [Music & Mental Health Survey Results](https://www.kaggle.com/datasets/catherinerasgaitis/mxmh-survey-results) dataset from Kaggle to predict anxiety scores from music listening habits.
+
+
+# Data Import and Viewing
 First, we import the data.
 
 ::: {.panel-tabset}
@@ -29,7 +38,9 @@ First, we import the data.
 ## R
 
 ```{r, r-data-import}
-# install.packages(c("janitor", "readr", "here"))
+# install.packages(c("janitor", "tidyverse", "tidymodels"))
+library(tidymodels)
+library(tidyverse)
 
 # Grab relative data path
 data_path <-
@@ -41,7 +52,7 @@ data_path <-
 
 # Import data and clean vars
 df_mh_music_r <-
-  readr::read_csv(data_path) |>
+  read_csv(data_path) |>
   janitor::clean_names()
 
 ```
@@ -52,19 +63,32 @@ df_mh_music_r <-
 import polars as pl
 import janitor.polars
 from pathlib import Path
+from plotnine import ggplot, aes, after_stat, element_blank, element_text, geom_bar, geom_text, labs, scale_fill_gradient2, scale_x_discrete, theme, theme_minimal
+import textwrap
 
-data_path = Path("data") / "mxmh_survey_results.csv"
+# Python has been SUPER annoying with paths for me in quarto docs
+# Maybe it's me/my machine but, meh
+# Setting two possible locations for the data file
+possible_paths = [
+    Path("data") / "mxmh_survey_results.csv",
+    Path("mental_health_music") / "data" / "mxmh_survey_results.csv",
+]
 
-# Read in csv
+for path in possible_paths:
+    if path.exists():
+        data_path = path
+        break
+else:
+    raise FileNotFoundError("mxmh_survey_results.csv not found in expected locations.")
+
+# Read in csv and clean up the names
 df_mh_music_py = pl.read_csv(
     data_path,
     # This is needed because there's decimals in the
     # scoring cols where integer was inferred
     infer_schema_length=1000,
-)
+).clean_names(remove_special=True)
 
-# Clean the names
-df_mh_music_py = df_mh_music_py.clean_names(remove_special=True)
 ```
 
 :::
@@ -95,15 +119,322 @@ df_mh_music_py.glimpse()
 
 :::
 
-# Data Cleaning and Preprocessing
+# Data Exploration
 
-# Model Fitting
+Looking at the data, I'm interested in predicting "anxiety score" from musical listening patterns with respect to genre frequencies.
+We'll need the `anxiety`, `frequency_*` and maybe the `hours_per_day` variables, so let's visualize what we have here.
+
+For the anxiety score interpretation on a scale from 0 to 10, respondents where asked "how often do you experience this?":
+  
+  * 0 - I do not experience this.
+
+  * 10 - I experience this regularly, constantly/or to an extreme.
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+So, of no surprise to me, this data is right-skewed with a concentration sitting around a score from 7 - 8.
+The density curve also shows limited variability at lower anxiety levels ("flattening" of the curve), which may affect model performance in predicting across the full range of the outcome.
+
+```{r, r-eda, fig.align="center"}
+df_mh_music_r |>
+  ggplot(aes(x = anxiety)) +
+  geom_histogram(
+    aes(y = after_stat(density), fill = after_stat(count)),
+    bins = 11,
+    color = "#000000"
+  ) +
+  geom_density(color = "#000000", linewidth = 3) +
+  geom_density(color = "#a873d1", linewidth = 1) +
+  scale_fill_gradient2(
+    low = "#ffffff",
+    high = "#250647"
+  ) +
+  labs(
+    title = "Distribution of Self-Reported Anxiety Scores",
+    subtitle = "Among Survey Respondents",
+    fill = "Total Responses:",
+    x = "Reported Anxiety Score",
+    y = "Density"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    text = element_text(size = 10),
+    legend.position = "top"
+  )
+```
+
+## Python
+
+I'm genuinely curious to see how ages play out with this. Which generation has the most anxiety on average? This data was first uploaded onto Kaggle three years ago; So I'll use the year of 2022 to create categories of generations like "Millennials", "Gen-Z", etc. We'll calculate it based on this random table Google generated:
+
+<br>
+
+| Generation Name             | Birth Years    | Current Age Range (as of 2022)      |
+|-----------------------------|---------------|--------------------------------------|
+| The Silent Generation       | 1928–1945     | 77–94 years old                      |
+| Baby Boomers                | 1946–1964     | 58–76 years old                      |
+| Generation X (Gen X)        | 1965–1980     | 42–57 years old                      |
+| Millennials (Gen Y)         | 1981–1996     | 26–41 years old                      |
+| Generation Z (Gen Z)        | 1997–2012     | 10–25 years old                      |
+
+----
+
+<br>
+
+```{python, py-eda , fig.align="center"}
+# Set the labels and wrap them for the plot
+generation_labels = [
+    "The Silent Generation",
+    "Baby Boomers",
+    "Gen-X",
+    "Millennials",
+    "Gen-Z",
+]
+
+# List comps are my favorite thing about Python so far
+generation_labels_wrapped = [
+    textwrap.fill(label, width=10) if len(label) > 12 else label
+    for label in generation_labels
+]
+
+# Cant't calc birth year without age, so drop nulls
+# then derive birth year
+df_mh_music_py = (
+    df_mh_music_py.with_columns((2022 - pl.col("age")).alias("birth_year"))
+    .with_columns(
+        pl.when(pl.col("birth_year").is_between(1927, 1945, closed="both"))
+        .then(pl.lit(generation_labels_wrapped[0]))
+        .when(pl.col("birth_year").is_between(1946, 1964, closed="both"))
+        .then(pl.lit(generation_labels_wrapped[1]))
+        .when(pl.col("birth_year").is_between(1965, 1980, closed="both"))
+        .then(pl.lit(generation_labels_wrapped[2]))
+        .when(pl.col("birth_year").is_between(1981, 1996, closed="both"))
+        .then(pl.lit(generation_labels_wrapped[3]))
+        .otherwise(pl.lit(generation_labels_wrapped[4]))
+        .alias("generation")
+    )
+    .group_by("generation")
+    .agg(pl.col("anxiety").mean().alias("mean_anxiety"), pl.len().alias("n_generation"))
+)
+
+df_mh_music_py = df_mh_music_py.with_columns(
+    pl.col("mean_anxiety")
+    .map_elements(lambda x: f"{x:.2f}" if x is not None else None)
+    .alias("top_label"),
+    ("(n = " + pl.col("n_generation").cast(str) + ")").alias("bottom_label"),
+)
+
+
+(
+    ggplot(df_mh_music_py, aes(x="generation", y="mean_anxiety", fill="mean_anxiety"))
+    + geom_bar(stat="identity", color="#000000")
+    + geom_text(
+        label=df_mh_music_py["top_label"], nudge_y=-0.5, size=13, fontweight="bold"
+    )
+    + geom_text(label=df_mh_music_py["bottom_label"], nudge_y=-1.1, fontstyle="italic")
+    + scale_x_discrete(limits=generation_labels_wrapped)
+    + scale_fill_gradient2(low="#f0cf59", high="#822801")
+    + theme_minimal()
+    + theme(
+        plot_title=element_text(size=14, face="bold"),
+        text=element_text(size=10),
+        legend_position="top",
+        axis_text_y=element_blank(),
+        axis_title_y=element_blank(),
+        axis_title_x=element_blank(),
+        axis_text_x=element_text(size=10, face="demibold", color="#000000"),
+    )
+    + labs(
+        title="Mean Self-Reported Anxiety Score",
+        subtitle="Among Generational Groups",
+        fill="Average Anxiety Score:",
+    )
+)
+
+```
+
+<br>
+
+To absolutely no one's surprise, millennials and Gen-Z have the highest reported scores of anxiety. But also, as I expected, major selection bias is going on here as the sample sizes among the generations are super imbalanced. Do we really have 2 respondents from the silent generation? Sounds sus. I expected 0. It's also interesting that Millennials and Gen-Z are almost identical. We're just doomed I guess 🫠
+:::
+# Data Cleaning 
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+# Train/Test Split
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+
+# Model Building
+
+## Recipe Definition
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+## Model Specification
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+## Workflow Creation
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+# Model Tuning
+
+## Cross-Validation Setup
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+## Tuning Grid & Selection
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+# Final Model Tuning
+
+::: {.panel-tabset collapse=true}
+
+## R
+
+```{r}
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
 
 # Model Evaluation
 
-# Feature Importance / Coefficients
+::: {.panel-tabset collapse=true}
 
-# Interpretation & Insights
+## R
+
+```{r}
+
+```
+
+## Python
+
+```{python}
+
+
+```
+
+:::
+
+# Comparison & Takeaways
 
 # Conclusion
 
