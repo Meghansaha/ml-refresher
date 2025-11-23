@@ -101,8 +101,6 @@ Then, do a little skimming with glimpse...
 
 ```{r, r-data-glimpse}
 #| output-fold: true
-library(dplyr)
-
 # Take a peek
 df_mh_music_r |>
   glimpse()
@@ -122,7 +120,7 @@ df_mh_music_py.glimpse()
 # Data Exploration
 
 Looking at the data, I'm interested in predicting "anxiety score" from musical listening patterns with respect to genre frequencies.
-We'll need the `anxiety`, `frequency_*` and maybe the `hours_per_day` variables, so let's visualize what we have here.
+We'll need the `anxiety` and the `frequency_*`, so let's visualize what we have here.
 
 For the anxiety score interpretation on a scale from 0 to 10, respondents where asked "how often do you experience this?":
   
@@ -184,7 +182,7 @@ I'm genuinely curious to see how ages play out with this. Which generation has t
 
 <br>
 
-```{python, py-eda , fig.align="center"}
+```{python, py-eda, fig.align="center"}
 # Set the labels and wrap them for the plot
 generation_labels = [
     "The Silent Generation",
@@ -202,7 +200,7 @@ generation_labels_wrapped = [
 
 # Cant't calc birth year without age, so drop nulls
 # then derive birth year
-df_mh_music_py = (
+df_mh_music_py_eda = (
     df_mh_music_py.with_columns((2022 - pl.col("age")).alias("birth_year"))
     .with_columns(
         pl.when(pl.col("birth_year").is_between(1927, 1945, closed="both"))
@@ -220,7 +218,7 @@ df_mh_music_py = (
     .agg(pl.col("anxiety").mean().alias("mean_anxiety"), pl.len().alias("n_generation"))
 )
 
-df_mh_music_py = df_mh_music_py.with_columns(
+df_mh_music_py_eda = df_mh_music_py_eda.with_columns(
     pl.col("mean_anxiety")
     .map_elements(lambda x: f"{x:.2f}" if x is not None else None)
     .alias("top_label"),
@@ -229,12 +227,12 @@ df_mh_music_py = df_mh_music_py.with_columns(
 
 
 (
-    ggplot(df_mh_music_py, aes(x="generation", y="mean_anxiety", fill="mean_anxiety"))
+    ggplot(df_mh_music_py_eda, aes(x="generation", y="mean_anxiety", fill="mean_anxiety"))
     + geom_bar(stat="identity", color="#000000")
     + geom_text(
-        label=df_mh_music_py["top_label"], nudge_y=-0.5, size=13, fontweight="bold"
+        label=df_mh_music_py_eda["top_label"], nudge_y=-0.5, size=13, fontweight="bold"
     )
-    + geom_text(label=df_mh_music_py["bottom_label"], nudge_y=-1.1, fontstyle="italic")
+    + geom_text(label=df_mh_music_py_eda["bottom_label"], nudge_y=-1.1, fontstyle="italic")
     + scale_x_discrete(limits=generation_labels_wrapped)
     + scale_fill_gradient2(low="#f0cf59", high="#822801")
     + theme_minimal()
@@ -260,21 +258,68 @@ df_mh_music_py = df_mh_music_py.with_columns(
 
 To absolutely no one's surprise, millennials and Gen-Z have the highest reported scores of anxiety. But also, as I expected, major selection bias is going on here as the sample sizes among the generations are super imbalanced. Do we really have 2 respondents from the silent generation? Sounds sus. I expected 0. It's also interesting that Millennials and Gen-Z are almost identical. We're just doomed I guess 🫠
 :::
-# Data Cleaning 
+# Data Cleaning & Preprocessing
 
 ::: {.panel-tabset collapse=true}
 
 ## R
 
-```{r}
+Now, we'll just grab the columns we need and make sure there's no missing values or anything like that. In R, we can make our `frequency_*` variables into factors as well. Each `frequency_*` variable has four possible values: "Never", "Rarely", "Sometimes", "Very frequently" to which each respondent can answer to the question "How often do you listen to * genre?"
+
+```{r, r-clean}
+df_mh_music_r_sub <-
+  df_mh_music_r |>
+  # Only select what we need
+  select(anxiety, starts_with("Frequency")) |>
+  #
+  drop_na() |>
+  mutate(
+    across(
+      starts_with("Frequency"),
+      \(x) factor(
+        x,
+        levels = c("Never", "Rarely", "Sometimes", "Very frequently")
+      )
+    )
+  )
 
 ```
 
 ## Python
 
+In python, there isn't a direct "factor" equivalent like in R. We can use scikit-learn's class `OrdinalEncoder` from the `sklearn.preprocessing` submodule. We do this by creating the order of the values and transforming the columns in `df_mh_music_py`. Because I'm using polars, there an extra step to get a polars dataframe back after the transformations. 
+
 ```{python}
+# Import scikit learn modules
+from sklearn.preprocessing import OrdinalEncoder
+from sklearn.compose import ColumnTransformer
+import polars.selectors as cs
 
+# Identify frequency columns
+freq_cols = df_mh_music_py.select(cs.starts_with("frequency")).columns
 
+# Set up the transformer for ordinal encoding
+frequency_categories = ["Never", "Rarely", "Sometimes", "Very frequently"]
+frequency_transformer = ColumnTransformer(
+    transformers=[
+        (
+            "freq_ord",
+            OrdinalEncoder(categories=[frequency_categories] * len(freq_cols)),
+            freq_cols,
+        )
+    ],
+    # We need to keep the anxiety column
+    remainder="passthrough",
+    verbose_feature_names_out=False,
+)
+
+# Need this for a polars output
+frequency_transformer.set_output(transform="polars")
+
+# Fit and transform, keeping anxiety and frequency columns
+df_mh_music_py_sub = frequency_transformer.fit_transform(
+    df_mh_music_py.select(["anxiety"] + freq_cols)
+)
 ```
 
 :::
