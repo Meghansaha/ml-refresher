@@ -18,7 +18,7 @@ venv/
 
 # Quarto render artifacts
 _site/
-_files/
+*_files/
 *.js
 *.css
 *.html
