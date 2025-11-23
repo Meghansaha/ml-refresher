@@ -16,7 +16,7 @@ Using the [Music & Mental Health Survey Results](https://www.kaggle.com/datasets
 
 ## What's Inside
 
-- Exploratory data analysis comparing anxiety across demographics
+- VERY BASIC Exploratory data analysis comparing anxiety across demographics
 - Simple ML workflow in both R (tidymodels) and Python (scikit-learn)
 - Side-by-side syntax comparison for common modeling tasks
 
@@ -24,8 +24,6 @@ Using the [Music & Mental Health Survey Results](https://www.kaggle.com/datasets
 
 **R**: tidymodels, tidyverse, ggplot2  
 **Python**: scikit-learn, polars, plotnine
-
-*Note: If polars was a person and I saw them in person, I would fight them ON SIGHT.*
 
 ## Status
 
