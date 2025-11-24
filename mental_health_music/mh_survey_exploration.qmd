@@ -350,7 +350,7 @@ target = df_mh_music_py_sub.select("anxiety")
 
 # 75% train 25% test split four dfs in total. test and trains for both features and target
 df_feats_train, df_feats_test, df_target_train, df_target_test = train_test_split(
-    X, y, test_size=0.25, random_state=901622
+    feats, target, test_size=0.25, random_state=901622
 )
 ```
 
