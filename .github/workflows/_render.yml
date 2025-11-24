@@ -25,16 +25,8 @@ jobs:
       - name: Install R packages
         run: |
           Rscript -e "install.packages(c(
-            'tidymodels',
-            'ggplot2',
-            'dplyr',
-            'readr',
-            'tibble',
-            'janitor',
-            'here',
-            'reticulate',
-            'knitr',
-            'rmarkdown'
+            'tidymodels','ggplot2','dplyr','readr','tibble',
+            'janitor','here','reticulate','knitr','rmarkdown'
           ), repos='https://cloud.r-project.org/')"
 
       - name: Set up Python
@@ -50,16 +42,13 @@ jobs:
 
       - name: Install Python packages
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - uses: quarto-dev/quarto-actions/setup@v2
 
       - name: Render QMD
-        run: |
-          # Point reticulate to your virtual environment
-          Rscript -e "library(reticulate); use_python('.venv/Scripts/python.exe', required=TRUE)"
-          # Render the document
-          quarto render mental_health_music/mh_survey_exploration.qmd
+        run: quarto render mental_health_music/mh_survey_exploration.qmd
 
       - name: Deploy to gh-pages
         env:
@@ -71,9 +60,10 @@ jobs:
           git fetch origin gh-pages
           git checkout gh-pages || git checkout --orphan gh-pages
 
-          # Copy only the HTML output
+          # Remove old HTML and copy new output
+          rm -f *.html
           cp -r mental_health_music/*.html .
 
-          git add mental_health_music/*.html
+          git add *.html
           git commit -m "Update mh_survey_exploration.html" || echo "No changes to commit"
           git push origin gh-pages
