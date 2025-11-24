@@ -2,7 +2,7 @@ name: Render Quarto Document to GitHub Pages
 
 on:
   pull_request:
-    branches: [main, test-gh-pages-ci] # include test branch if you want to test
+    branches: [main]
 
 jobs:
   render:
@@ -20,11 +20,13 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ env.R_LIBS_USER }}
-          key: ${{ runner.os }}-r-${{ hashFiles('**/*.R') }}
+          key: ${{ runner.os }}-r-${{ hashFiles('**/*.R','**/*.qmd') }}
 
       - name: Install R packages
         run: |
-          Rscript -e "install.packages(c('tidymodels','tidyverse','janitor','here', 'reticulate'), repos='https://cloud.r-project.org/')"
+          Rscript -e "install.packages(c(
+            'tidymodels','ggplot2','dplyr','readr','tibble','janitor','here','reticulate'
+          ), repos='https://cloud.r-project.org/')"
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -54,14 +56,12 @@ jobs:
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
 
-          # Fetch gh-pages or create if missing
           git fetch origin gh-pages
           git checkout gh-pages || git checkout --orphan gh-pages
 
-          # Copy only the new HTML
+          # Copy only the HTML output
           cp -r mental_health_music/*.html .
 
-          # Commit and push changes
           git add mental_health_music/*.html
           git commit -m "Update mh_survey_exploration.html" || echo "No changes to commit"
           git push origin gh-pages
