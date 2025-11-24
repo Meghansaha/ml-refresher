@@ -30,4 +30,8 @@ _site/
 
 *.woff
 *.woff2
+mental_health_music/.quarto/project-cache/
 .quarto/project-cache/
+
+/.quarto/
+**/*.quarto_ipynb

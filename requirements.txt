@@ -1,0 +1,6 @@
+polars
+pyjanitor
+plotnine
+scikit-learn
+numpy
+pandas
