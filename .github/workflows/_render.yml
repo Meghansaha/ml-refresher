@@ -25,7 +25,16 @@ jobs:
       - name: Install R packages
         run: |
           Rscript -e "install.packages(c(
-            'tidymodels','ggplot2','dplyr','readr','tibble','janitor','here','reticulate'
+            'tidymodels',
+            'ggplot2',
+            'dplyr',
+            'readr',
+            'tibble',
+            'janitor',
+            'here',
+            'reticulate',
+            'knitr',
+            'rmarkdown'
           ), repos='https://cloud.r-project.org/')"
 
       - name: Set up Python
@@ -40,13 +49,16 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
 
       - name: Install Python packages
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
 
       - uses: quarto-dev/quarto-actions/setup@v2
 
       - name: Render QMD
         run: |
-          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          # Point reticulate to your virtual environment
+          Rscript -e "library(reticulate); use_python('.venv/Scripts/python.exe', required=TRUE)"
+          # Render the document
           quarto render mental_health_music/mh_survey_exploration.qmd
 
       - name: Deploy to gh-pages
