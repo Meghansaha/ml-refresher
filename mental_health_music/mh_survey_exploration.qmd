@@ -350,7 +350,7 @@ target = df_mh_music_py_sub.select("anxiety")
 
 # 75% train 25% test split four dfs in total. test and trains for both features and target
 df_feats_train, df_feats_test, df_target_train, df_target_test = train_test_split(
-    X, y, test_size=0.25, random_state=901622
+    feats, target, test_size=0.25, random_state=901622
 )
 ```
 
@@ -365,13 +365,43 @@ df_feats_train, df_feats_test, df_target_train, df_target_test = train_test_spli
 
 ## R
 
-```{r}
+Next, I'll make a recipe for the training set that will convert the frequency columns into dummies.
 
+```{r, r-recipe}
+mh_music_recipe <-
+  recipe(anxiety ~ ., df_music_r_training) |>
+  step_dummy(all_nominal_predictors())
 ```
 
 ## Python
 
-```{python}
+Scikit-learn doesn't have the "recipe" framework we can use in tidymodels, but it does have `ColumnTransformer` in its `sklearn.compose` submodule that will allow us to create the same post-processing steps.
+```{python, py-recipe}
+from sklearn.preprocessing import OrdinalEncoder
+from sklearn.compose import ColumnTransformer
+
+frequency_categories = ["Never", "Rarely", "Sometimes", "Very frequently"]
+
+frequency_transformer = ColumnTransformer(
+    transformers=[
+        (
+            "freq_ord",
+            OrdinalEncoder(categories=[frequency_categories] * len(freq_cols)),
+            freq_cols,
+        )
+    ],
+    remainder="passthrough",
+    verbose_feature_names_out=False,
+)
+
+# Convert back to polars
+frequency_transformer.set_output(transform="polars")
+
+# Fit on training set
+df_feats_train_transformed = frequency_transformer.fit_transform(df_feats_train)
+
+# Transform test set
+df_feats_test_transformed = frequency_transformer.transform(df_feats_test)
 
 
 ```
