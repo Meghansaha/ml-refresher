@@ -41,6 +41,7 @@ First, we import the data.
 # install.packages(c("janitor", "tidyverse", "tidymodels"))
 library(tidymodels)
 library(tidyverse)
+library(reticulate)
 
 # Grab relative data path
 data_path <-
