@@ -290,58 +290,68 @@ df_mh_music_r_sub <-
 
 ## Python
 
-In python, there isn't a direct "factor" equivalent like in R. We can use scikit-learn's class `OrdinalEncoder` from the `sklearn.preprocessing` submodule. We do this by creating the order of the values and transforming the columns in `df_mh_music_py`. Because I'm using polars, there an extra step to get a polars dataframe back after the transformations. 
+In python, there isn't a direct "factor" equivalent like in R. We can make an equivalent while processing the data after we split it in the nest step. For now, I'll just select the relevant columns and make the frequency columns are casted as categorical just to be explicit. 
 
 ```{python}
-# Import scikit learn modules
-from sklearn.preprocessing import OrdinalEncoder
-from sklearn.compose import ColumnTransformer
+import polars as pl
 import polars.selectors as cs
 
-# Identify frequency columns
+# Select the relevant columns
 freq_cols = df_mh_music_py.select(cs.starts_with("frequency")).columns
+df_mh_music_py_sub = df_mh_music_py.select(["anxiety"] + freq_cols).drop_nulls()
 
-# Set up the transformer for ordinal encoding
-frequency_categories = ["Never", "Rarely", "Sometimes", "Very frequently"]
-frequency_transformer = ColumnTransformer(
-    transformers=[
-        (
-            "freq_ord",
-            OrdinalEncoder(categories=[frequency_categories] * len(freq_cols)),
-            freq_cols,
-        )
-    ],
-    # We need to keep the anxiety column
-    remainder="passthrough",
-    verbose_feature_names_out=False,
+# Casting frequency columns to categorical
+df_mh_music_py_sub = df_mh_music_py_sub.with_columns(
+    [pl.col(col).cast(pl.Categorical) for col in freq_cols]
 )
 
-# Need this for a polars output
-frequency_transformer.set_output(transform="polars")
-
-# Fit and transform, keeping anxiety and frequency columns
-df_mh_music_py_sub = frequency_transformer.fit_transform(
-    df_mh_music_py.select(["anxiety"] + freq_cols)
-)
 ```
 
 :::
 
 # Train/Test Split
 
+From this point on, I'm going to try and mirror tidymodels as closely as I can based on scikit-learn's current APIs.
+
 ::: {.panel-tabset collapse=true}
 
 ## R
 
-```{r}
+Since this will be a basic analysis, I'll do a simple test/training split while keeping {rsample}'s default proportion of 75%. Meaning we'll retain 75% of the data for training and test the remaining 25%. I'll set a seed for reproducibility.
 
+```{r, r-split}
+set.seed(901622)
+
+# Make a split w/ rsample
+mh_music_r_split <-
+  df_mh_music_r_sub |>
+  initial_split()
+
+df_music_r_testing <-
+  mh_music_r_split |>
+  testing()
+
+df_music_r_training <-
+  mh_music_r_split |>
+  training()
 ```
 
 ## Python
 
-```{python}
+We'll also do a 75% test/train split in sci-kit learn. The `sklearn.model_selection` submodule has `train_test_split` which seems to be the closest equivalent to {rasmple}'s `initial_split`.
+```{python, py-split}
+from sklearn.model_selection import train_test_split
 
+# Features (frequency columns)
+feats = df_mh_music_py_sub.drop("anxiety")
 
+# Target (Anxiety score)
+target = df_mh_music_py_sub.select("anxiety")
+
+# 75% train 25% test split four dfs in total. test and trains for both features and target
+df_feats_train, df_feats_test, df_target_train, df_target_test = train_test_split(
+    X, y, test_size=0.25, random_state=901622
+)
 ```
 
 :::
