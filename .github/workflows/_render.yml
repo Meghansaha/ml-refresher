@@ -1,7 +1,7 @@
 name: Render Quarto Document to GitHub Pages
 
 on:
-  push:
+  pull_request:
     branches: [main, test-gh-pages-ci] # include test branch if you want to test
 
 jobs:
@@ -9,54 +9,44 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repo
       - uses: actions/checkout@v3
 
-      # 2️⃣ Set up R
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.5.2"
 
-      # 3️⃣ Cache R packages
       - name: Cache R packages
         uses: actions/cache@v3
         with:
           path: ${{ env.R_LIBS_USER }}
           key: ${{ runner.os }}-r-${{ hashFiles('**/*.R') }}
 
-      # 4️⃣ Install required R packages
       - name: Install R packages
         run: |
           Rscript -e "install.packages(c('tidymodels','tidyverse','janitor','here'), repos='https://cloud.r-project.org/')"
 
-      # 5️⃣ Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.13.1"
 
-      # 6️⃣ Cache Python packages
       - name: Cache Python packages
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
 
-      # 7️⃣ Install Python packages from requirements.txt
       - name: Install Python packages
         run: pip install -r requirements.txt
 
-      # 8️⃣ Install Quarto
       - uses: quarto-dev/quarto-actions/setup@v2
 
-      # 9️⃣ Render the QMD document
       - name: Render QMD
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           quarto render mental_health_music/mh_survey_exploration.qmd
 
-      # 🔟 Deploy rendered HTML to gh-pages (safe update)
       - name: Deploy to gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
