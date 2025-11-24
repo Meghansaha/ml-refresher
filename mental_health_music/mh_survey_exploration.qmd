@@ -276,10 +276,12 @@ df_mh_music_r_sub <-
   mutate(
     across(
       starts_with("Frequency"),
-      \(x) factor(
-        x,
-        levels = c("Never", "Rarely", "Sometimes", "Very frequently")
-      )
+      \(x) {
+        factor(
+          x,
+          levels = c("Never", "Rarely", "Sometimes", "Very frequently")
+        )
+      }
     )
   )
 

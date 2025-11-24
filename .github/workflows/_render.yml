@@ -1,7 +1,7 @@
-name: Render and Deploy Quarto Document
+name: Render Quarto Document to GitHub Pages
 
 on:
-  push:
+  pull_request:
     branches: [main]
 
 jobs:
@@ -11,17 +11,45 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set up Quarto
-        uses: quarto-dev/quarto-actions/setup@v2
-
-      - name: Render the document
-        run: |
-          quarto render mental_health_music/mh_survey_exploration.qmd \
-            --output-dir _site
-
-      - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: _site
-          publish_branch: gh-pages
+          r-version: "4.5.2"
+
+      - name: Install R packages
+        run: |
+          Rscript -e "install.packages(c('tidymodels','tidyverse','janitor','here'), repos='https://cloud.r-project.org/')"
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13.1"
+
+      - name: Install Python packages
+        run: |
+          pip install polars pyjanitor plotnine scikit-learn numpy pandas
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Render QMD
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          quarto render mental_health_music/mh_survey_exploration.qmd
+
+      - name: Deploy to gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+
+          # Fetch gh-pages or create if missing
+          git fetch origin gh-pages
+          git checkout gh-pages || git checkout --orphan gh-pages
+
+          # Copy only the new HTML
+          cp -r mental_health_music/*.html .
+
+          # Commit and push changes
+          git add mental_health_music/*.html
+          gi
