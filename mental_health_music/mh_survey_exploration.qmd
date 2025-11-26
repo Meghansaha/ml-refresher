@@ -365,7 +365,7 @@ df_feats_train, df_feats_test, df_target_train, df_target_test = train_test_spli
 
 ## R
 
-Next, I'll make a recipe for the training set that will convert the frequency columns into dummies.
+Next, I'll make a recipe for the training set that will convert the frequency columns into dummies. I'm also noting that given the model I'm choosing in the next step, this probably isn't required in {parsnip}, but I wanted to make the comparison of this side-by-side with python.
 
 ```{r, r-recipe}
 mh_music_recipe <-
@@ -414,14 +414,26 @@ df_feats_test_transformed = frequency_transformer.transform(df_feats_test)
 
 ## R
 
-```{r}
-
+I'm not trying to get too into the weeds here, but I'll set some simple model specs. I'll leave `cost_complexity` for tuning with dials via a basic grid search. I'll set `tree_depth` to 5 and will tweak it if it's fitted. I'll use the "rpart" engine for proper recursion through the trees. Lastly, because our target is an anxiety score, we'll set the model to "regression". 
+```{r, r-model-spec}
+model_tree_r <-
+  decision_tree(
+  cost_complexity = tune(),  
+  tree_depth = 5
+  ) |>
+  set_engine("rpart") |>
+  set_mode("regression")
 ```
 
 ## Python
 
-```{python}
+In Python, the process is similar. Using the tree module and `DecisionTreeRegressor` class. The training features and target go in the `fit` class constructor, and the testing features go into the `predict` class constructor.
+```{python, py-model-spec}
+from sklearn import tree
 
+model_tree_py = tree.DecisionTreeRegressor(random_state=901622, max_depth=5)
+model_tree_py = model_tree_py.fit(df_feats_train_transformed, df_target_train)
+model_tree_py = model_tree_py.predict(df_feats_test_transformed)
 
 ```
 
