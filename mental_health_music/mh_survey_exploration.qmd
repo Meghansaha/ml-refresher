@@ -418,8 +418,8 @@ I'm not trying to get too into the weeds here, but I'll set some simple model sp
 ```{r, r-model-spec}
 model_tree_r <-
   decision_tree(
-  cost_complexity = tune(),  
-  tree_depth = 5
+    cost_complexity = tune(),
+    tree_depth = 5
   ) |>
   set_engine("rpart") |>
   set_mode("regression")
@@ -432,8 +432,6 @@ In Python, the process is similar. Using the tree module and `DecisionTreeRegres
 from sklearn import tree
 
 model_tree_py = tree.DecisionTreeRegressor(random_state=901622, max_depth=5)
-model_tree_py = model_tree_py.fit(df_feats_train_transformed, df_target_train)
-model_tree_py = model_tree_py.predict(df_feats_test_transformed)
 
 ```
 
@@ -445,14 +443,19 @@ model_tree_py = model_tree_py.predict(df_feats_test_transformed)
 
 ## R
 
-```{r}
+```{r, r-workflow}
+workflow_r <-
+  workflow() |>
+  add_recipe(mh_music_recipe) |>
+  add_model(model_tree_r)
 
 ```
 
 ## Python
 
-```{python}
-
+```{python, py-workflow}
+model_tree_py = model_tree_py.fit(df_feats_train_transformed, df_target_train)
+workflow_py = model_tree_py.predict(df_feats_test_transformed)
 
 ```
 
@@ -465,14 +468,22 @@ model_tree_py = model_tree_py.predict(df_feats_test_transformed)
 
 ## R
 
-```{r}
-
+```{r, r-cross-val}
+set.seed(901622)
+df_music_folds_r <- vfold_cv(df_music_r_training, v = 5)
 ```
 
 ## Python
 
 ```{python}
+from sklearn.model_selection import cross_val_score
 
+music_folds_py = cross_val_score(
+  model_tree_py,
+  df_feats_train_transformed,
+  df_target_train,
+  cv = 5
+  )
 
 ```
 
@@ -483,14 +494,32 @@ model_tree_py = model_tree_py.predict(df_feats_test_transformed)
 
 ## R
 
-```{r}
+```{r, r-grid-tuning}
+df_tree_grid_r <- tibble(
+  cost_complexity = c(1e-10, 1e-8, 1e-6, 1e-4, 1e-3)
+)
+
+df_mh_music_tune_results_r <-
+  workflow_r |>
+  tune_grid(
+    resamples = df_music_folds_r,
+    grid = df_tree_grid_r,
+    metrics = metric_set(rmse, rsq)
+  )
+
+show_best(df_mh_music_tune_results_r, metric = "rmse")
+best_params_r <- select_best(df_mh_music_tune_results_r, metric = "rmse")
 
 ```
 
 ## Python
 
-```{python}
+```{python, py-grid-tuning}
+from sklearn.model_selection import GridSearchCV
 
+param_grid = {"ccp_alpha": [1e-10, 1.78e-8, 3.16e-6, 5.62e-4, 0.1]}
+grid_search = GridSearchCV(estimator=model_tree_py, param_grid=param_grid, cv=5)
+grid_search.fit(df_feats_train_transformed, df_target_train)
 
 ```
 
