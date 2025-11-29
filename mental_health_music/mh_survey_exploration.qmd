@@ -64,7 +64,22 @@ df_mh_music_r <-
 import polars as pl
 import janitor.polars
 from pathlib import Path
-from plotnine import ggplot, aes, after_stat, element_blank, element_text, geom_bar, geom_text, labs, scale_fill_gradient2, scale_x_discrete, theme, theme_minimal
+from plotnine import (
+    ggplot,
+    aes,
+    after_stat,
+    element_blank,
+    element_text,
+    geom_abline,
+    geom_bar,
+    geom_point,
+    geom_text,
+    labs,
+    scale_fill_gradient2,
+    scale_x_discrete,
+    theme,
+    theme_minimal,
+)
 import textwrap
 
 # Python has been SUPER annoying with paths for me in quarto docs
@@ -136,7 +151,7 @@ For the anxiety score interpretation on a scale from 0 to 10, respondents where 
 So, of no surprise to me, this data is right-skewed with a concentration sitting around a score from 7 - 8.
 The density curve also shows limited variability at lower anxiety levels ("flattening" of the curve), which may affect model performance in predicting across the full range of the outcome.
 
-```{r, r-eda, fig.align="center"}
+```{r, r-eda-1, fig.align="center"}
 df_mh_music_r |>
   ggplot(aes(x = anxiety)) +
   geom_histogram(
@@ -145,10 +160,10 @@ df_mh_music_r |>
     color = "#000000"
   ) +
   geom_density(color = "#000000", linewidth = 3) +
-  geom_density(color = "#a873d1", linewidth = 1) +
+  geom_density(color = "#60bcde", linewidth = 1) +
   scale_fill_gradient2(
     low = "#ffffff",
-    high = "#250647"
+    high = "#084164"
   ) +
   labs(
     title = "Distribution of Self-Reported Anxiety Scores",
@@ -164,6 +179,126 @@ df_mh_music_r |>
     legend.position = "top"
   )
 ```
+
+I also should look at the music genre categories as there are `r df_mh_music_r |> select(starts_with("frequency")) |> length()` different genres that can each have one of four different responses: “Never”, “Rarely”, “Sometimes”, or “Very frequently”
+
+```{r, r-eda-2, fig.align="center"}
+# Need to pivot the genres
+df_genre_pivot_r <-
+  df_mh_music_r |>
+  pivot_longer(
+    cols = starts_with("frequency")
+  ) |>
+  mutate(
+    name_cleaned = str_remove(name, "^frequency_"),
+    name_cleaned = case_when(
+      name_cleaned == "k_pop" ~ "K-pop",
+      name_cleaned == "r_b" ~ "r & b",
+      name_cleaned == "hip_hop" ~ "hip-hop",
+      name_cleaned == "edm" ~ "EDM",
+      .default = str_replace_all(name_cleaned, "_", " ")
+    ),
+    name_cleaned = if_else(
+      name_cleaned == "EDM",
+      name_cleaned,
+      str_to_title(name_cleaned)
+    )
+  )
+
+df_genre_pivot_r |>
+  ggplot(aes(x = name_cleaned, fill = value)) +
+  geom_bar(
+    color = "#000000"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Never" = "#FFFFFF",
+      "Rarely" = "#ACBFCB",
+      "Sometimes" = "#5A8097",
+      "Very frequently" = "#084164"
+    )
+  ) +
+  labs(
+    title = "Distribution of Music Genre Listening Frequency",
+    subtitle = "Among Survey Respondents",
+    fill = "Response:",
+    x = "Musical Genre",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_line(color = "#000000"),
+    plot.title = element_text(size = 14, face = "bold"),
+    text = element_text(size = 10),
+    axis.text.x.bottom = element_text(
+      size = 10,
+      angle = 45,
+      vjust = 1,
+      hjust = 1
+    ),
+    legend.position = "top"
+  )
+
+```
+
+So a lot of responses have a value of "Never" or "Rarely". Have 16 different genres with each having one of four possible responses means that the feature space is way too big because that's a possibility of 4^`16 combinations (`r scales::comma(4^16)`) !!!
+
+I'm going to make a binary response variable. Either "Yes" or "No". Where a value of "Very frequently" or "Sometimes" will be "Yes", and the others, "No". I'm also going to see which of these genres are listened to by at least 35% of the survey respondents. I'll mark this with a dotted black line on the graph.
+
+```{r, r-eda-3, fig.align="center"}
+df_genre_pivot_r |>
+  mutate(
+    value_collapsed = case_when(
+      value %in% c("Never", "Rarely") ~ "No",
+      value %in% c("Sometimes", "Very frequently") ~ "Yes",
+    ),
+    name_cleaned_ordered = fct_reorder(
+      name_cleaned,
+      value_collapsed == "Yes",
+      .fun = sum,
+      .desc = TRUE
+    )
+  ) |>
+  ggplot(aes(x = name_cleaned_ordered, fill = value_collapsed)) +
+  geom_bar(
+    color = "#000000"
+  ) +
+  geom_hline(
+    yintercept = 736 * .35,
+    color = "#000000",
+    linewidth = 1.5,
+    linetype = 2
+  ) +
+  scale_fill_manual(
+    values = c(
+      "No" = "#FFFFFF",
+      "Yes" = "#084164"
+    )
+  ) +
+  labs(
+    title = "Distribution of Music Genre Listening Frequency",
+    subtitle = "Among Survey Respondents",
+    fill = "Response:",
+    x = "Musical Genre",
+    y = "Count"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_line(color = "#000000"),
+    plot.title = element_text(size = 14, face = "bold"),
+    text = element_text(size = 10),
+    axis.text.x.bottom = element_text(
+      size = 10,
+      angle = 45,
+      vjust = 1,
+      hjust = 1
+    ),
+    legend.position = "top"
+  )
+
+```
+
+So the genres that are listened to by at least 35% of the respondents are Rock, Pop, Hip-Hop, Rap, Classical, Video Game Music, R & B, and Metal. Not bad at all. I'll drop the responses for the other genres and only focus on these eight most listened to genres.
 
 ## Python
 
@@ -226,7 +361,6 @@ df_mh_music_py_eda = df_mh_music_py_eda.with_columns(
     ("(n = " + pl.col("n_generation").cast(str) + ")").alias("bottom_label"),
 )
 
-
 (
     ggplot(df_mh_music_py_eda, aes(x="generation", y="mean_anxiety", fill="mean_anxiety"))
     + geom_bar(stat="identity", color="#000000")
@@ -265,14 +399,28 @@ To absolutely no one's surprise, millennials and Gen-Z have the highest reported
 
 ## R
 
-Now, we'll just grab the columns we need and make sure there's no missing values or anything like that. In R, we can make our `frequency_*` variables into factors as well. Each `frequency_*` variable has four possible values: "Never", "Rarely", "Sometimes", "Very frequently" to which each respondent can answer to the question "How often do you listen to * genre?"
+Now, we'll just grab the columns we need and make sure there's no missing values or anything like that. In R, we can make our `frequency_*` variables into factors as well. As mentioned earlier, there are four potential responses that a genre can have to answer to the question "How often do you listen to * genre?"
 
 ```{r, r-clean}
+genres_to_keep <-
+  paste0(
+    "frequency_",
+    c(
+      "rock",
+      "pop",
+      "hip_hop",
+      "rap",
+      "classical",
+      "video_game_music",
+      "r_b",
+      "metal"
+    )
+  )
+
 df_mh_music_r_sub <-
   df_mh_music_r |>
   # Only select what we need
-  select(anxiety, starts_with("Frequency")) |>
-  #
+  select(anxiety, genres_to_keep) |>
   drop_na() |>
   mutate(
     across(
@@ -294,10 +442,18 @@ In python, there isn't a direct "factor" equivalent like in R. We can make an eq
 
 ```{python}
 import polars as pl
-import polars.selectors as cs
 
 # Select the relevant columns
-freq_cols = df_mh_music_py.select(cs.starts_with("frequency")).columns
+freq_cols = ["frequency_" + prefix for prefix in ["rock",
+    "pop",
+    "hip_hop",
+    "rap",
+    "classical",
+    "video_game_music",
+    "rb",
+    "metal",
+]]
+
 df_mh_music_py_sub = df_mh_music_py.select(["anxiety"] + freq_cols).drop_nulls()
 
 # Casting frequency columns to categorical
@@ -377,7 +533,7 @@ mh_music_recipe <-
 
 Scikit-learn doesn't have the "recipe" framework we can use in tidymodels, but it does have `ColumnTransformer` in its `sklearn.compose` submodule that will allow us to create the same post-processing steps.
 ```{python, py-recipe}
-from sklearn.preprocessing import OrdinalEncoder
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 
 frequency_categories = ["Never", "Rarely", "Sometimes", "Very frequently"]
@@ -385,8 +541,12 @@ frequency_categories = ["Never", "Rarely", "Sometimes", "Very frequently"]
 frequency_transformer = ColumnTransformer(
     transformers=[
         (
-            "freq_ord",
-            OrdinalEncoder(categories=[frequency_categories] * len(freq_cols)),
+            "freq_onehot",
+            OneHotEncoder(
+                categories=[frequency_categories] * len(freq_cols),
+                handle_unknown="ignore",
+                sparse_output=False,  # <-- use this instead of sparse=False
+            ),
             freq_cols,
         )
     ],
@@ -414,12 +574,13 @@ df_feats_test_transformed = frequency_transformer.transform(df_feats_test)
 
 ## R
 
-I'm not trying to get too into the weeds here, but I'll set some simple model specs. I'll leave `cost_complexity` for tuning with dials via a basic grid search. I'll set `tree_depth` to 5 and will tweak it if it's fitted. I'll use the "rpart" engine for proper recursion through the trees. Lastly, because our target is an anxiety score, we'll set the model to "regression". 
+I'm not trying to get too into the weeds here, but I'll do simple tuning for `cost_complexity`, `tree_depth`, and `min_n`. I'll use the "rpart" engine for proper recursion through the trees. Lastly, because our target is an anxiety score, we'll set the model to "regression". 
 ```{r, r-model-spec}
 model_tree_r <-
   decision_tree(
-  cost_complexity = tune(),  
-  tree_depth = 5
+    cost_complexity = tune(),
+    tree_depth = tune(),
+    min_n = tune()
   ) |>
   set_engine("rpart") |>
   set_mode("regression")
@@ -430,10 +591,7 @@ model_tree_r <-
 In Python, the process is similar. Using the tree module and `DecisionTreeRegressor` class. The training features and target go in the `fit` class constructor, and the testing features go into the `predict` class constructor.
 ```{python, py-model-spec}
 from sklearn import tree
-
 model_tree_py = tree.DecisionTreeRegressor(random_state=901622, max_depth=5)
-model_tree_py = model_tree_py.fit(df_feats_train_transformed, df_target_train)
-model_tree_py = model_tree_py.predict(df_feats_test_transformed)
 
 ```
 
@@ -445,14 +603,20 @@ model_tree_py = model_tree_py.predict(df_feats_test_transformed)
 
 ## R
 
-```{r}
+```{r, r-workflow}
+workflow_r <-
+  workflow() |>
+  add_recipe(mh_music_recipe) |>
+  add_model(model_tree_r)
 
 ```
 
 ## Python
 
-```{python}
-
+```{python, py-workflow}
+grid_search = grid_search.fit(df_feats_train_transformed, df_target_train)
+final_model_py = grid_search.best_estimator_
+workflow_py = final_model_py.predict(df_feats_test_transformed)
 
 ```
 
@@ -465,14 +629,22 @@ model_tree_py = model_tree_py.predict(df_feats_test_transformed)
 
 ## R
 
-```{r}
-
+```{r, r-cross-val}
+set.seed(901622)
+df_music_folds_r <- vfold_cv(df_music_r_training, v = 5)
 ```
 
 ## Python
 
 ```{python}
+from sklearn.model_selection import cross_val_score
 
+music_folds_py = cross_val_score(
+  model_tree_py,
+  df_feats_train_transformed,
+  df_target_train,
+  cv = 5
+  )
 
 ```
 
@@ -483,15 +655,58 @@ model_tree_py = model_tree_py.predict(df_feats_test_transformed)
 
 ## R
 
-```{r}
+```{r, r-grid-tuning-1}
+df_tree_grid_r <- grid_regular(
+  cost_complexity(range = c(-10, -3), trans = scales::log10_trans()),
+  tree_depth(range = c(2, 10)),
+  min_n(range = c(2, 20)),
+  levels = 5
+)
 
+df_mh_music_tune_results_r <-
+  workflow_r |>
+  tune_grid(
+    resamples = df_music_folds_r,
+    grid = df_tree_grid_r,
+    metrics = metric_set(rmse, rsq)
+  )
+
+show_best(df_mh_music_tune_results_r, metric = "rmse")
+best_params_r <- select_best(df_mh_music_tune_results_r, metric = "rmse")
+
+```
+
+When tuning these results, I actually got a warning:
+
+```r
+→ A | warning: A correlation computation is required,
+but `estimate` is constant and has 0 standard deviation,
+resulting in a divide by 0 error. `NA` will be returned.
+There were issues with some computations   A: x5
+```
+
+Looking at my best models above, I can verify that these warnings were not referring to my best models here. So I'll continue on with the best one I have:
+
+```{r, r-grid-tuning-2}
+best_params_r
 ```
 
 ## Python
 
-```{python}
+```{python, py-grid-tuning}
+from sklearn.model_selection import GridSearchCV
 
+param_grid = {
+    "ccp_alpha": [1.000000e-10, 5.623413e-09, 3.162278e-07, 1.778279e-05, 1.000000e-03],
+    "max_depth": [2, 4, 6, 8, 10],  # matches tree_depth in R
+    "min_samples_leaf": [2, 6, 10, 14, 18],  # matches min_n in R
+}
 
+grid_search = GridSearchCV(estimator=model_tree_py, param_grid=param_grid, cv=5)
+
+grid_search = grid_search.fit(df_feats_train_transformed, df_target_train)
+final_model_py = grid_search.best_estimator_
+y_pred = final_model_py.predict(df_feats_test_transformed)
 ```
 
 :::
@@ -503,14 +718,20 @@ model_tree_py = model_tree_py.predict(df_feats_test_transformed)
 ## R
 
 ```{r}
+final_workflow_r <-
+  workflow_r |>
+  finalize_workflow(best_params_r)
 
+final_fit_r <-
+  final_workflow_r |>
+  fit(df_music_r_training)
 ```
 
 ## Python
 
 ```{python}
-
-
+final_model_py = grid_search.best_estimator_
+final_model_py.fit(df_feats_train_transformed, df_target_train)
 ```
 
 :::
@@ -522,14 +743,56 @@ model_tree_py = model_tree_py.predict(df_feats_test_transformed)
 ## R
 
 ```{r}
+df_music_predictions <-
+  predict(final_fit_r, df_music_r_testing) |>
+  bind_cols(df_music_r_testing)
 
+metrics(df_music_predictions, truth = anxiety, estimate = .pred)
+
+ggplot(df_music_predictions, aes(x = anxiety, y = .pred)) +
+  geom_point(alpha = 0.5) +
+  geom_abline(color = "red") +
+  labs(
+    x = "Actual Anxiety",
+    y = "Predicted Anxiety",
+    title = "Tuned Decision Tree Predictions"
+  )
 ```
 
 ## Python
 
 ```{python}
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import numpy as np
 
+# Predict on the test set
+y_pred = final_model_py.predict(df_feats_test_transformed)
 
+# Combine predictions and actuals into a DataFrame
+df_music_predictions = pl.DataFrame(
+    {"anxiety": df_target_test["anxiety"], "pred": y_pred}
+)
+
+# Calculate metrics
+mse = mean_squared_error(df_music_predictions["anxiety"], df_music_predictions["pred"])
+rmse = np.sqrt(mse)
+mae = mean_absolute_error(df_music_predictions["anxiety"], df_music_predictions["pred"])
+r2 = r2_score(df_music_predictions["anxiety"], df_music_predictions["pred"])
+
+# Print metrics
+rmse, mae, r2
+
+# Plot actual vs predicted
+(
+    ggplot(df_music_predictions, aes(x="anxiety", y="pred"))
+    + geom_point(alpha=0.5)
+    + geom_abline(color="red")
+    + labs(
+        x="Actual Anxiety",
+        y="Predicted Anxiety",
+        title="Tuned Decision Tree Predictions",
+    )
+)
 ```
 
 :::
