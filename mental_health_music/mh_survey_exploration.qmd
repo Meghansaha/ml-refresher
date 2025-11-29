@@ -545,7 +545,7 @@ frequency_transformer = ColumnTransformer(
             OneHotEncoder(
                 categories=[frequency_categories] * len(freq_cols),
                 handle_unknown="ignore",
-                sparse=False,
+                sparse_output=False,  # <-- use this instead of sparse=False
             ),
             freq_cols,
         )
@@ -574,7 +574,7 @@ df_feats_test_transformed = frequency_transformer.transform(df_feats_test)
 
 ## R
 
-I'm not trying to get too into the weeds here, but I'll set some simple model specs. I'll leave `cost_complexity` for tuning with dials via a basic grid search. I'll set `tree_depth` to 5 and will tweak it if it's fitted. I'll use the "rpart" engine for proper recursion through the trees. Lastly, because our target is an anxiety score, we'll set the model to "regression". 
+I'm not trying to get too into the weeds here, but I'll do simple tuning for `cost_complexity`, `tree_depth`, and `min_n`. I'll use the "rpart" engine for proper recursion through the trees. Lastly, because our target is an anxiety score, we'll set the model to "regression". 
 ```{r, r-model-spec}
 model_tree_r <-
   decision_tree(
@@ -591,7 +591,6 @@ model_tree_r <-
 In Python, the process is similar. Using the tree module and `DecisionTreeRegressor` class. The training features and target go in the `fit` class constructor, and the testing features go into the `predict` class constructor.
 ```{python, py-model-spec}
 from sklearn import tree
-
 model_tree_py = tree.DecisionTreeRegressor(random_state=901622, max_depth=5)
 
 ```
@@ -656,7 +655,6 @@ music_folds_py = cross_val_score(
 
 ## R
 
-I'm now going to attempt to create a regular grid of 5 values for the `cost_complexity` parameter, which controls how much the decision tree is pruned. I'll then perform a grid search using 5-fold cross-validation to find the best value of cost_complexity for predicting anxiety scores. I'll then try to determine the best model and choose it for further tuning.
 ```{r, r-grid-tuning-1}
 df_tree_grid_r <- grid_regular(
   cost_complexity(range = c(-10, -3), trans = scales::log10_trans()),
@@ -720,7 +718,7 @@ grid_search = grid_search.fit(df_feats_train_transformed, df_target_train)
 ::: {.panel-tabset collapse=true}
 
 ## R
-I'll now finalize the workflow and re-fit it with my best model.
+
 ```{r}
 final_workflow_r <-
   workflow_r |>
